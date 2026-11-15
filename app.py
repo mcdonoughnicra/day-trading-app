@@ -13,6 +13,7 @@ from sklearn.metrics import accuracy_score
 st.set_page_config(page_title="Day Trading Scanner", layout="wide", page_icon="📈")
 
 st.title("📈 Day Trading Scanner: ML + Technicals + Social Sentiment")
+st.caption("Created by Craig McDonough")
 st.caption("Ranks stocks by machine-learning probability of upward move (trained on technical features) blended with heuristic signals and Reddit social attention. **Not financial advice.**")
 
 # Disclaimer
