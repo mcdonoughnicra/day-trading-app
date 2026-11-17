@@ -10,7 +10,39 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
-st.set_page_config(page_title="Day Trading Scanner", layout="wide", page_icon="📈")
+st.set_page_config(
+    page_title="Day Trading Scanner",
+    layout="wide",
+    page_icon="📈",
+    initial_sidebar_state="expanded"
+)
+
+# Add mobile-friendly CSS
+st.markdown("""
+<style>
+    /* Better mobile layout */
+    .main .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    /* Make tables scroll horizontally on small screens */
+    .stDataFrame {
+        overflow-x: auto;
+    }
+    /* Larger touch targets for buttons */
+    .stButton > button {
+        width: 100%;
+        min-height: 48px;
+    }
+    @media (max-width: 768px) {
+        .stSidebar {
+            width: 100% !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
 
 st.title("📈 Day Trading Scanner: ML + Technicals + Social Sentiment")
 st.caption("Created by Craig McDonough")
@@ -214,6 +246,7 @@ def get_stock_analysis(ticker):
             "hist": hist,
             "sma20": sma20,
             "sma50": sma50,
+            "float_shares": info.get("floatShares") or info.get("sharesOutstanding"),
         }
     except Exception as e:
         return None
@@ -324,6 +357,7 @@ if scan_button:
                     "MACD Hist": analysis["macd_hist"],
                     "Vol Ratio": analysis["vol_ratio"],
                     "Mentions": social_info.get("mentions", 0),
+                    "Float (M)": round(analysis["float_shares"] / 1_000_000, 1) if analysis.get("float_shares") else "—",
                     "Signals": " | ".join(reasons[:5]) if reasons else "—",
                     "_analysis": analysis,
                     "_reasons": reasons,
@@ -368,10 +402,24 @@ if st.session_state.results is not None:
     
     st.subheader("Full Ranking")
     st.dataframe(
-        df[["Ticker", "Combined Score", "ML Prob %", "ML Acc %", "Price", "Change %", "RSI", "MACD Hist", "Vol Ratio", "Mentions", "Signals"]],
+        df[["Ticker", "Combined Score", "ML Prob %", "ML Acc %", "Price", "Change %", "RSI", "MACD Hist", "Vol Ratio", "Mentions", "Float (M)", "Signals"]],
         width="stretch",
         hide_index=True,
     )
+    
+    # Low Float Movers section
+    st.subheader("🚀 Highest Probability Low Float Movers")
+    low_float = df[df["Float (M)"].apply(lambda x: isinstance(x, (int, float)) and x < 20)].copy()
+    if not low_float.empty:
+        low_float = low_float.sort_values("Combined Score", ascending=False)
+        st.dataframe(
+            low_float[["Ticker", "Combined Score", "ML Prob %", "Price", "Change %", "Float (M)", "Vol Ratio", "Signals"]].head(10),
+            width="stretch",
+            hide_index=True,
+        )
+        st.caption("Low float = under 20 million shares. These can move faster but are riskier.")
+    else:
+        st.info("No low-float stocks found in this scan (or float data unavailable).")
     
     # Chart for selected
     st.subheader("Detail Chart")
@@ -396,6 +444,34 @@ if st.session_state.results is not None:
         
         # Volume
         fig.add_trace(go.Bar(x=hist.index, y=hist["Volume"], name="Volume", marker_color="rgba(100,100,100,0.4)"), row=2, col=1)
+        
+        # Detect simple buy points (MACD bullish cross or RSI bounce from oversold)
+        close = hist["Close"]
+        rsi_series = compute_rsi(close)
+        macd_line, macd_sig, _ = compute_macd(close)
+        
+        buy_indices = []
+        buy_prices = []
+        for i in range(1, len(hist)):
+            # MACD bullish cross
+            if macd_line.iloc[i] > macd_sig.iloc[i] and macd_line.iloc[i-1] <= macd_sig.iloc[i-1]:
+                buy_indices.append(hist.index[i])
+                buy_prices.append(close.iloc[i])
+            # RSI crossing above 35 from below (bounce potential)
+            elif rsi_series.iloc[i] > 35 and rsi_series.iloc[i-1] <= 35 and not np.isnan(rsi_series.iloc[i]):
+                buy_indices.append(hist.index[i])
+                buy_prices.append(close.iloc[i])
+        
+        # Add red upward arrows at buy points
+        if buy_indices:
+            fig.add_trace(go.Scatter(
+                x=buy_indices,
+                y=buy_prices,
+                mode="markers",
+                marker=dict(symbol="triangle-up", size=12, color="red"),
+                name="Potential Buy",
+                hovertemplate="Potential Buy<br>%{x}<br>$%{y:.2f}<extra></extra>"
+            ), row=1, col=1)
         
         fig.update_layout(height=600, title=f"{selected} — Combined Score: {row['Combined Score']} | ML Prob: {row['ML Prob %']}%", xaxis_rangeslider_visible=False)
         fig.update_xaxes(rangeslider_visible=False)
