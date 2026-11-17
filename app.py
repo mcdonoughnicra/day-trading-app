@@ -339,8 +339,8 @@ if scan_button:
         results = []
         progress = st.progress(0)
         status = st.empty()
-        for i, ticker in enumerate(tickers[:40]):  # limit to avoid long scans
-            status.text(f"Analyzing {ticker} ({i+1}/{min(len(tickers),40)})...")
+        for i, ticker in enumerate(tickers[:100]):  # limit to avoid long scans
+            status.text(f"Analyzing {ticker} ({i+1}/{min(len(tickers),100)})...")
             analysis = get_stock_analysis(ticker)
             if analysis:
                 social_info = social.get(ticker, {})
@@ -362,7 +362,7 @@ if scan_button:
                     "_analysis": analysis,
                     "_reasons": reasons,
                 })
-            progress.progress((i + 1) / min(len(tickers), 40))
+            progress.progress((i + 1) / min(len(tickers), 100))
         
         progress.empty()
         status.empty()
