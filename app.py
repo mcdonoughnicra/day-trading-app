@@ -81,8 +81,9 @@ top_n_social = st.sidebar.slider("How many top social tickers to add", 5, 30, 15
 scan_button = st.sidebar.button("🔍 Scan for Highest Probability Upside", type="primary")
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Optional: Finnhub API key for alternative quote source (free key at finnhub.io)")
+st.sidebar.caption("Optional: API keys for fresher quotes")
 finnhub_key = st.sidebar.text_input("Finnhub API Key (optional)", type="password", value="")
+polygon_key = st.sidebar.text_input("Polygon.io API Key (optional)", type="password", value="")
 
 # Helper functions
 @st.cache_data(ttl=300)
@@ -220,9 +221,20 @@ def get_stock_analysis(ticker):
         avg_vol_20 = volume.rolling(20).mean().iloc[-1]
         vol_ratio = volume.iloc[-1] / avg_vol_20 if avg_vol_20 > 0 else 1
         
-        # Optional Finnhub live quote
-        finnhub_price = None
-        if finnhub_key:
+        # Optional live quotes from Polygon or Finnhub
+        if polygon_key:
+            try:
+                poly = requests.get(
+                    f"https://api.polygon.io/v2/last/trade/{ticker}?apiKey={polygon_key}",
+                    timeout=5
+                )
+                if poly.status_code == 200:
+                    p = poly.json()
+                    if p.get("results") and p["results"].get("p"):
+                        current_price = p["results"]["p"]
+            except Exception:
+                pass
+        elif finnhub_key:
             try:
                 fh = requests.get(f"https://finnhub.io/api/v1/quote?symbol={ticker}&token={finnhub_key}", timeout=5)
                 if fh.status_code == 200:
