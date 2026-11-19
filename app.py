@@ -247,6 +247,7 @@ def get_stock_analysis(ticker):
             "sma20": sma20,
             "sma50": sma50,
             "float_shares": info.get("floatShares") or info.get("sharesOutstanding"),
+            "market_cap": info.get("marketCap"),
         }
     except Exception as e:
         return None
@@ -358,6 +359,7 @@ if scan_button:
                     "Vol Ratio": analysis["vol_ratio"],
                     "Mentions": social_info.get("mentions", 0),
                     "Float (M)": round(analysis["float_shares"] / 1_000_000, 1) if analysis.get("float_shares") else "—",
+                    "Market Cap (M)": round(analysis["market_cap"] / 1_000_000, 1) if analysis.get("market_cap") else "—",
                     "Signals": " | ".join(reasons[:5]) if reasons else "—",
                     "_analysis": analysis,
                     "_reasons": reasons,
@@ -402,7 +404,7 @@ if st.session_state.results is not None:
     
     st.subheader("Full Ranking")
     st.dataframe(
-        df[["Ticker", "Combined Score", "ML Prob %", "ML Acc %", "Price", "Change %", "RSI", "MACD Hist", "Vol Ratio", "Mentions", "Float (M)", "Signals"]],
+        df[["Ticker", "Combined Score", "ML Prob %", "ML Acc %", "Price", "Change %", "RSI", "MACD Hist", "Vol Ratio", "Mentions", "Float (M)", "Market Cap (M)", "Signals"]],
         width="stretch",
         hide_index=True,
     )
@@ -420,6 +422,20 @@ if st.session_state.results is not None:
         st.caption("Low float = under 20 million shares. These can move faster but are riskier.")
     else:
         st.info("No low-float stocks found in this scan (or float data unavailable).")
+    
+    # Micro Cap section
+    st.subheader("💎 Top 30 Micro-Cap Stocks (Highest Probability)")
+    micro_caps = df[df["Market Cap (M)"].apply(lambda x: isinstance(x, (int, float)) and 0 < x < 300)].copy()
+    if not micro_caps.empty:
+        micro_caps = micro_caps.sort_values("Combined Score", ascending=False).head(30)
+        st.dataframe(
+            micro_caps[["Ticker", "Combined Score", "ML Prob %", "Price", "Change %", "Market Cap (M)", "Float (M)", "Vol Ratio", "Signals"]],
+            width="stretch",
+            hide_index=True,
+        )
+        st.caption("Micro-caps = market cap under $300 million. Higher volatility and risk. Same scoring methodology as the main list.")
+    else:
+        st.info("No micro-cap stocks found in this scan (or market cap data unavailable).")
     
     # Chart for selected
     st.subheader("Detail Chart")
