@@ -260,6 +260,8 @@ def get_stock_analysis(ticker):
             "sma50": sma50,
             "float_shares": info.get("floatShares") or info.get("sharesOutstanding"),
             "market_cap": info.get("marketCap"),
+            "sector": info.get("sector"),
+            "industry": info.get("industry"),
         }
     except Exception as e:
         return None
@@ -372,6 +374,7 @@ if scan_button:
                     "Mentions": social_info.get("mentions", 0),
                     "Float (M)": round(analysis["float_shares"] / 1_000_000, 1) if analysis.get("float_shares") else "—",
                     "Market Cap (M)": round(analysis["market_cap"] / 1_000_000, 1) if analysis.get("market_cap") else "—",
+                    "Industry": analysis.get("industry") or "—",
                     "Signals": " | ".join(reasons[:5]) if reasons else "—",
                     "_analysis": analysis,
                     "_reasons": reasons,
@@ -448,6 +451,20 @@ if st.session_state.results is not None:
         st.caption("Micro-caps = market cap under $300 million. Higher volatility and risk. Same scoring methodology as the main list.")
     else:
         st.info("No micro-cap stocks found in this scan (or market cap data unavailable).")
+    
+    # Biotechnology section
+    st.subheader("🧬 Top 10 Biotechnology Stocks (Highest Probability)")
+    biotech = df[df["Industry"].astype(str).str.contains("Biotechnology|Biotech", case=False, na=False)].copy()
+    if not biotech.empty:
+        biotech = biotech.sort_values("Combined Score", ascending=False).head(10)
+        st.dataframe(
+            biotech[["Ticker", "Combined Score", "ML Prob %", "Price", "Change %", "Market Cap (M)", "Vol Ratio", "Signals"]],
+            width="stretch",
+            hide_index=True,
+        )
+        st.caption("Biotechnology stocks identified by industry classification. Same scoring methodology as the main list.")
+    else:
+        st.info("No biotechnology stocks found in this scan (or industry data unavailable). Try adding biotech tickers to the sidebar list.")
     
     # Chart for selected
     st.subheader("Detail Chart")
